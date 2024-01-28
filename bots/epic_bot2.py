@@ -47,14 +47,12 @@ class BotPlayer(Player):
         self.towers_attack(rc)
         self.turn += 1
 
-    def find_id(self, x, y, rc):
+    def find_tower(self, x, y, rc):
         towers = rc.get_towers(rc.get_ally_team())
-        for tower_id in towers:
-            print(towers[tower_id])
-            x1, y1 = towers[tower_id]
-            print("gg")
-            if (x, y) == (x1, y1): return tower_id
-        return -1
+        for tower in towers:
+            x1, y1 = tower.x, tower.y
+            if (x, y) == (x1, y1): return tower
+        return None
 
     def filled_strat(self, rc):
         map = rc.get_map()
@@ -65,16 +63,15 @@ class BotPlayer(Player):
         farm_id = None
         for i in range(map.width):
             for j in range(map.height):
-                print("cccccccc")
-                tower_id = self.find_id(i,j, rc)
+                tower = self.find_id(i,j, rc)
                 print("dddddddd")
-                farm = (towers[tower_id] == TowerType.GUNSHIP)
+                farm = (tower != None and tower == TowerType.SOLAR_FARM)
                 if not (map.is_space(i, j) and (rc.is_placeable(rc.get_ally_team(), i, j or farm) or TowerType.GUNSHIP)): continue
                 paths = self.paths_in_range(map, i, j, tower)
                 if paths > maxpaths:
                     maxpaths = paths
                     coords = (i,j)
-                    if (farm): farm_id = tower_id
+                    if (farm): farm_id = tower.id
                     else: farm_id = None
         x,y = coords
         print("bbbbbbb")
@@ -88,7 +85,6 @@ class BotPlayer(Player):
 
         if (self.filled):
             if (rc.get_balance(rc.get_ally_team()) >= tower.cost):
-                print("new")
                 self.filled_strat(rc)
             return 0
         
