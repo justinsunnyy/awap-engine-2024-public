@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
+from os import close
 from src.game import Game
 import argparse
 import json
+import sys
 
 def main():
     parser = argparse.ArgumentParser(description="Run the game")
@@ -25,6 +27,7 @@ def main():
         red_path = args.red_path
         map_path = args.map_path
 
+    sys.stderr = open('error.txt', 'w')
     game = Game(
         blue_path=blue_path,
         red_path=red_path,
@@ -33,6 +36,7 @@ def main():
     )
     winner = game.run_game()
     print(f"Winner: {winner}")
+    sys.stderr.close()
 
 if __name__ == "__main__":
     main()
