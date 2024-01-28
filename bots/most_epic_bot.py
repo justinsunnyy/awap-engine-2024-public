@@ -13,12 +13,9 @@ class BotPlayer(Player):
         self.farm_count = 1
         self.reinforcer_count = 1
         self.gf_ratio = 1
-        self.gb_ratio = 1.5
+        self.gb_ratio = 1
         self.turn = 0
         self.stage = 1
-        self.solar_farms = []
-        self.r_count = 10
-        self.gunship_dps = dict()
 
     def paths_in_range(self, map: Map, x: int, y: int, tower):
         res = 0
@@ -41,10 +38,12 @@ class BotPlayer(Player):
     def play_turn(self, rc: RobotController):
         if (self.turn == 1000):
             self.gf_ratio = 0.4
-        if (self.turn == 3600):
+        if (self.turn == 4500):
             self.gb_ratio = 9999999999999999999
             self.sell_bombers(rc)
             self.bomb_count = 1
+            while (self.stage1(rc) == 1):
+                self.stage1(rc)
         while (self.build_towers(rc) == 1):
             self.build_towers(rc)
         self.towers_attack(rc)
@@ -52,7 +51,7 @@ class BotPlayer(Player):
 
     def stage1(self, rc):
         tower = TowerType.GUNSHIP #what tower to build?
-        if (self.gunship_count / self.bomb_count > self.gb_ratio and self.bomb_count < 6):
+        if (self.gunship_count / self.bomb_count > self.gb_ratio and self.bomb_count < 10):
             tower = TowerType.BOMBER
         if (self.gunship_count / self.farm_count >= self.gf_ratio):
             tower = TowerType.SOLAR_FARM
@@ -79,7 +78,6 @@ class BotPlayer(Player):
         rc.build_tower(tower, x, y)
         if (tower == TowerType.GUNSHIP):
             self.gunship_count += 1
-            self.gunship_dps[(x,y)] = maxpaths
         elif (tower == TowerType.BOMBER): self.bomb_count += 1
         elif (tower == TowerType.SOLAR_FARM): self.farm_count+=1
         else: self.reinforcer_count += 1
@@ -91,28 +89,13 @@ class BotPlayer(Player):
         solar_farm_exists = False
         for tower in towers:
             x,y = tower.x, tower.y
-            solar_farm_exists = solar_farm_exists or (tower.type == TowerType.SOLAR_FARM)
             paths = self.paths_in_range(map,x,y,TowerType.GUNSHIP)
             if (tower.type == TowerType.SOLAR_FARM and paths > 0):
                 rc.sell_tower(tower.id)
                 rc.build_tower(TowerType.GUNSHIP, x, y)
-                self.gunship_dps[(x,y)] = paths
+                solar_farm_exists = True
         if (not solar_farm_exists):
             self.stage = 3
-    
-    #x, y must be on a gunship
-    def dps_diff(self, rc, x, y):
-        if ((x,y) not in self.gunship_dps): 
-            return -1
-        towers = rc.get_towers(rc.get_ally_team())
-        map = rc.get_map()
-        res = - self.paths_in_range(map, x, y, TowerType.GUNSHIP)
-        for tower in towers:
-            if (tower.type != TowerType.GUNSHIP): continue
-            if ((tower.x - x)**2 + (tower.y-y)**2 > TowerType.REINFORCER.range): continue
-            if ((tower.x,tower.y) not in self.gunship_dps): continue
-            res += self.gunship_dps[(tower.x,tower.y)]*0.2
-        return res
 
     def find_tower(self, rc, x, y):
         towers = rc.get_towers(rc.get_ally_team())
@@ -128,17 +111,19 @@ class BotPlayer(Player):
                 if (not map.is_space(i, j)): continue
                 t = self.find_tower(rc,i,j)
                 if (t.type != TowerType.GUNSHIP): continue
+                if (rc.get_balance(rc.get_ally_team()) < 2200): continue
                 rc.sell_tower(t.id)
                 rc.build_tower(TowerType.REINFORCER, i, j)
 
     def build_towers(self, rc: RobotController):
+        map = rc.get_map()
         if (self.stage == 1):
             return self.stage1(rc)
         elif (self.stage == 2):
+            # if (rc.get_balance(rc.get_ally_team()) < map.height * map.width / 4 * 2200 + self.farm_count*-600):
+            #     return 0
             return self.stage2(rc)
         elif (self.stage == 3):
-            if (rc.get_balance(rc.get_ally_team()) < 200000): return 0
-            self.stage = 4
             return self.stage3(rc)
     
     def towers_attack(self, rc: RobotController):
