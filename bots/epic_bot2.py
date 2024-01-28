@@ -15,6 +15,8 @@ class BotPlayer(Player):
         self.gf_ratio = 1
         self.gb_ratio = 2
         self.turn = 0
+        self.id_counter = 0
+        self.filled = False
 
     def paths_in_range(self, map: Map, x: int, y: int, tower):
         res = 0
@@ -31,11 +33,11 @@ class BotPlayer(Player):
     def sell_bombers(self, rc):
         towers = rc.get_towers(rc.get_ally_team())
         for tower in towers:
-            if tower.type == TowerType.GUNSHIP:
+            if tower.type == TowerType.BOMBER:
                 rc.sell_tower(tower.id)
 
     def play_turn(self, rc: RobotController):
-        print(self.turn)
+        #print(self.turn)
         if (self.turn == 3000):
             self.sell_bombers(rc)
             self.gb_ratio = 9999999999999999999
@@ -45,12 +47,58 @@ class BotPlayer(Player):
         self.towers_attack(rc)
         self.turn += 1
 
+    def find_id(self, x, y, rc):
+        towers = rc.get_towers(rc.get_ally_team())
+        for tower_id in towers:
+            print(towers[tower_id])
+            x1, y1 = towers[tower_id]
+            print("gg")
+            if (x, y) == (x1, y1): return tower_id
+        return -1
+
+    def filled_strat(self, rc):
+        map = rc.get_map()
+        tower = TowerType.GUNSHIP
+        maxpaths = -99999999999999999
+        coords = (0, 0)
+        towers = rc.get_towers(rc.get_ally_team())
+        farm_id = None
+        for i in range(map.width):
+            for j in range(map.height):
+                print("cccccccc")
+                tower_id = self.find_id(i,j, rc)
+                print("dddddddd")
+                farm = (towers[tower_id] == TowerType.GUNSHIP)
+                if not (map.is_space(i, j) and (rc.is_placeable(rc.get_ally_team(), i, j or farm) or TowerType.GUNSHIP)): continue
+                paths = self.paths_in_range(map, i, j, tower)
+                if paths > maxpaths:
+                    maxpaths = paths
+                    coords = (i,j)
+                    if (farm): farm_id = tower_id
+                    else: farm_id = None
+        x,y = coords
+        print("bbbbbbb")
+        if (farm_id != None):
+            rc.sell_tower(farm_id)
+        rc.build_tower(tower, x, y)
+            
+
     def build_towers(self, rc: RobotController):
         tower = TowerType.GUNSHIP #what tower to build?
+
+        if (self.filled):
+            if (rc.get_balance(rc.get_ally_team()) >= tower.cost):
+                print("new")
+                self.filled_strat(rc)
+            return 0
+        
         if (self.gunship_count / self.bomb_count > self.gb_ratio):
             tower = TowerType.BOMBER
         if (self.gunship_count / self.farm_count >= self.gf_ratio):
             tower = TowerType.SOLAR_FARM
+
+        if (self.turn < 500):
+            tower = TowerType.GUNSHIP #start with 1 bomber
         if rc.get_balance(rc.get_ally_team()) < tower.cost:
             return 0
 
@@ -66,7 +114,9 @@ class BotPlayer(Player):
                     coords = (i,j)
         x,y = coords
 
-        if (maxpaths == -99999999999999999): return 0
+        if (maxpaths == -99999999999999999):
+            self.filled = True
+            return 0
 
         rc.build_tower(tower, x, y)
         if (tower == TowerType.GUNSHIP): self.gunship_count += 1
